@@ -1,6 +1,7 @@
 package com.example.taskflow.ui.screens
 
 import android.Manifest
+import android.os.Build
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
@@ -36,6 +37,13 @@ import java.time.LocalTime
 @Composable
 fun HomeScreen(uiState: TaskUiState, viewModel: TaskViewModel) {
     val micPermission = rememberPermissionState(Manifest.permission.RECORD_AUDIO)
+    val notificationPermission = rememberPermissionState(Manifest.permission.POST_NOTIFICATIONS)
+
+    LaunchedEffect(notificationPermission.status) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !notificationPermission.status.isGranted) {
+            notificationPermission.launchPermissionRequest()
+        }
+    }
     val requestMicPermission: (onGranted: () -> Unit) -> Unit = remember(micPermission) {
         { onGranted ->
             if (micPermission.status.isGranted) {
