@@ -36,6 +36,15 @@ import java.time.LocalTime
 @Composable
 fun HomeScreen(uiState: TaskUiState, viewModel: TaskViewModel) {
     val micPermission = rememberPermissionState(Manifest.permission.RECORD_AUDIO)
+    val requestMicPermission: (onGranted: () -> Unit) -> Unit = remember(micPermission) {
+        { onGranted ->
+            if (micPermission.status.isGranted) {
+                onGranted()
+            } else {
+                micPermission.launchPermissionRequest()
+            }
+        }
+    }
     var manualTitle by remember { mutableStateOf("") }
     var manualDetails by remember { mutableStateOf("") }
     var selectedPriority by remember { mutableStateOf(TaskPriority.MEDIUM) }
@@ -120,11 +129,7 @@ fun HomeScreen(uiState: TaskUiState, viewModel: TaskViewModel) {
                     Text("Tap mic to transcribe and auto-create a task", style = MaterialTheme.typography.bodySmall)
                 }
                 IconButton(onClick = {
-                    if (!micPermission.status.isGranted) {
-                        micPermission.launchPermissionRequest()
-                    } else {
-                        viewModel.analyzeAudioAndCreateTask()
-                    }
+                    requestMicPermission { viewModel.analyzeAudioAndCreateTask() }
                 }) {
                     Icon(Icons.Filled.Mic, contentDescription = "Record")
                 }
@@ -149,7 +154,12 @@ fun HomeScreen(uiState: TaskUiState, viewModel: TaskViewModel) {
 
         uiState.selectedTask?.let { task ->
             if (uiState.showDetail) {
-                TaskDetailSheet(task, onDismiss = { viewModel.selectTask(null) }, viewModel = viewModel)
+                TaskDetailSheet(
+                    task,
+                    onDismiss = { viewModel.selectTask(null) },
+                    requestMicPermission = requestMicPermission,
+                    viewModel = viewModel
+                )
             }
         }
     }
@@ -263,7 +273,12 @@ private fun SwipeableTaskCard(task: Task, onToggle: () -> Unit, onDelete: () -> 
 }
 
 @Composable
-fun TaskDetailSheet(task: Task, onDismiss: () -> Unit, viewModel: TaskViewModel) {
+fun TaskDetailSheet(
+    task: Task,
+    onDismiss: () -> Unit,
+    requestMicPermission: (onGranted: () -> Unit) -> Unit,
+    viewModel: TaskViewModel
+) {
     var title by remember { mutableStateOf(task.title) }
     var details by remember { mutableStateOf(task.details) }
     var priority by remember { mutableStateOf(task.priority) }
@@ -312,7 +327,12 @@ fun TaskDetailSheet(task: Task, onDismiss: () -> Unit, viewModel: TaskViewModel)
                     onValueChange = { reminder = it.toIntOrNull() ?: reminder },
                     label = { Text("Remind hours before") }
                 )
-                AttachmentActions(onAudio = { viewModel.attachAudio(task, "audio://sample") }, onImage = { viewModel.attachImage(task, "image://sample") }, onAnalyzeImage = { viewModel.analyzeImageAndCreateTask("image://analysis") }, onVoiceDetail = { viewModel.addTaskFromVoice("Dictated details for ${task.title}") })
+                AttachmentActions(
+                    onAudio = { requestMicPermission { viewModel.attachAudio(task, "audio://sample") } },
+                    onImage = { viewModel.attachImage(task, "image://sample") },
+                    onAnalyzeImage = { viewModel.analyzeImageAndCreateTask("image://analysis") },
+                    onVoiceDetail = { requestMicPermission { viewModel.addTaskFromVoice("Dictated details for ${task.title}") } }
+                )
             }
         }
     )
